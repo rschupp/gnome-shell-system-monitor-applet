@@ -2344,7 +2344,7 @@ function enable() {
         Main.__sm.elts.push(new Swap());
         Main.__sm.elts.push(new Net());
         Main.__sm.elts.push(new Disk());
-        Main.__sm.elts.push(new Gpu());
+        //Main.__sm.elts.push(new Gpu());
         Main.__sm.elts.push(new Thermal());
         Main.__sm.elts.push(new Fan());
         Main.__sm.elts.push(new Battery());
