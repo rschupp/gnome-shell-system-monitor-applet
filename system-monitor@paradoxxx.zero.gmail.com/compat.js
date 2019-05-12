@@ -1,5 +1,7 @@
 const Config = imports.misc.config;
 const Clutter = imports.gi.Clutter;
+const System = imports.system;
+const ByteArray = imports.byteArray;
 
 /** Compare two dotted version strings (like '10.2.3').
  * @returns {Integer} 0: v1 == v2, -1: v1 < v2, 1: v1 > v2
@@ -48,4 +50,40 @@ function color_from_string(color) {
     }
 
     return clutterColor;
+}
+
+function check_sensors(sensor_type) {
+    log("[System monitor] check_sensors(%s)".format(sensor_type));
+    let sensors = {};
+    let [ok, out, err] = GLib.spawn_sync(
+        null, ["/bin/sh", "-c", "ls /sys/class/hwmon/hwmon*/%s*_input".format(sensor_type)],
+        null, 0, null);
+    // NOTE: "".split("\n") returns [""], hence handle out == "" explicitly
+    if (out.length > 0) {
+        let hwmon = ByteArray.toString(out).trim("\n").split("\n");
+        for (let input_path of hwmon) {
+            // don't bother with unreadable sensors
+            try {
+                GLib.file_get_contents(input_path);
+            }
+            catch (e) {
+                log(e);
+                continue;
+            }
+            // NOTE: contents of "name" and "*_label" files have a trailing newline
+            let [, bytes]  = GLib.file_get_contents(GLib.path_get_dirname(input_path) + "/name");
+            let name = ByteArray.toString(bytes).trim("\n");
+            let label_path = input_path.replace(/_input$/, "_label");
+            let label;
+            if (GLib.file_test(label_path, GLib.FileTest.EXISTS)) {
+                [, bytes] = GLib.file_get_contents(label_path);
+                label = ByteArray.toString(bytes).trim("\n");
+            }
+            else {
+                label = GLib.path_get_basename(input_path).replace(/_input$/, "");
+            }
+            sensors["%s:%s".format(name, label)] = input_path;
+        }
+    }
+    return sensors;
 }
