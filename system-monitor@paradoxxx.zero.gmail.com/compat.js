@@ -1,5 +1,7 @@
 const Config = imports.misc.config;
 const Clutter = imports.gi.Clutter;
+const System = imports.system;
+const ByteArray = imports.byteArray;
 
 /** Compare two dotted version strings (like '10.2.3').
  * @returns {Integer} 0: v1 == v2, -1: v1 < v2, 1: v1 > v2
@@ -49,3 +51,26 @@ function color_from_string(color) {
 
     return clutterColor;
 }
+
+/* 
+ * In gjs versions prior to 1.54 the object returned by e.g. Gio.File.load_contents or
+ * GLib.file_get_contents (actually an array of guint8) could transparently be treated
+ * like a string, e.g. parseInt() worked. Since gjs 1.54 this will issue a warning:
+ *
+ *   Some code called array.toString() on a Uint8Array instance. Previously this would 
+ *   have interpreted the bytes of the array as a string, but that is nonstandard. 
+ *   In the future this will return the bytes as comma-separated digits. For the time being,
+ *   the old behavior has been preserved, but please fix your code anyway 
+ *   to explicitly call ByteArray.toString(array).
+ *
+ * Unfortunately using ByteArray.toString(array) also on gjs prior to 1.54 doesn't quite
+ * work, e.g. in the above example parseInt(ByteArray.toString(array)) always returns NaN.
+ *
+ * Create a compatibility function that does the right thing on any version of gjs and
+ * use it to mark those places where ByteArray.toString should be used with newer
+ * versions of gjs.
+ */
+function bytearray2string(a) {
+    return (System.version >= 15400) ? ByteArray.toString(a) : a
+}
+
