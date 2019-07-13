@@ -2,7 +2,6 @@ const Gtk = imports.gi.Gtk;
 const Gio = imports.gi.Gio;
 const Gdk = imports.gi.Gdk;
 const GLib = imports.gi.GLib;
-const Clutter = imports.gi.Clutter;
 const ByteArray = imports.byteArray;
 
 const Gettext = imports.gettext.domain('system-monitor');
@@ -39,28 +38,38 @@ function color_to_hex(color) {
 }
 
 function check_sensors(sensor_type) {
-    let inputs = [sensor_type + '1_input', sensor_type + '2_input', sensor_type + '3_input'];
-    let sensor_path = '/sys/class/hwmon/';
+    log("[System monitor] check_sensors(%s)".format(sensor_type));
     let sensor_list = [];
     let string_list = [];
-    let test;
-    for (let j = 0; j < 6; j++) {
-        for (let k = 0; k < inputs.length; k++) {
-            test = sensor_path + 'hwmon' + j + '/' + inputs[k];
-            if (!GLib.file_test(test, GLib.FileTest.EXISTS)) {
-                test = sensor_path + 'hwmon' + j + '/device/' + inputs[k];
-                if (!GLib.file_test(test, GLib.FileTest.EXISTS)) {
-                    continue;
-                }
+    let [ok, out, err] = GLib.spawn_sync(
+        null, ["/bin/sh", "-c", "ls /sys/class/hwmon/hwmon*/%s*_input".format(sensor_type)], 
+        null, 0, null);
+    // NOTE: "".split("\n") returns [""], hence handle out == "" explicitly
+    if (out.length > 0) {
+        let hwmon = ByteArray.toString(out).trim("\n").split("\n");
+        for (let input_path of hwmon) {
+            // don't bother with unreadable sensors
+            try {
+                GLib.file_get_contents(input_path);
             }
-            let sensor = test.substr(0, test.lastIndexOf('/'));
-            let result = GLib.file_get_contents(sensor + '/name');
+            catch (e) {
+                log(e);
+                continue;
+            }
+            // NOTE: contents of "name" and "*_label" files have a trailing newline
+            let [, bytes]  = GLib.file_get_contents(GLib.path_get_dirname(input_path) + "/name");
+            let name = ByteArray.toString(bytes).trim("\n");
+            let label_path = input_path.replace(/_input$/, "_label");
             let label;
-            if (result[0]) {
-                label = N_(Compat.bytearray2string(result[1])).split('\n')[0];
+            if (GLib.file_test(label_path, GLib.FileTest.EXISTS)) {
+                [, bytes] = GLib.file_get_contents(label_path);
+                label = ByteArray.toString(bytes).trim("\n");
             }
-            string_list.push(label.capitalize() + ' - ' + inputs[k].split('_')[0].capitalize());
-            sensor_list.push(test);
+            else {
+                label = GLib.path_get_basename(input_path).replace(/_input$/, "");
+            }
+            string_list.push("%s - %s".format(name.capitalize(), label.capitalize()));
+            sensor_list.push(input_path);
         }
     }
     return [sensor_list, string_list];
