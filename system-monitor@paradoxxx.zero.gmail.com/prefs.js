@@ -184,18 +184,17 @@ const SettingFrame = class SystemMonitor {
                 set_color(color, Schema, key);
             });
         } else if (config.match(/sensor/)) {
-            let sensor_type = configParent === 'fan' ? 'fan' : 'temp';
-            let _sensors = Compat.check_sensors(sensor_type);
-            let _idlist = Object.keys(_sensors);
+            let sensors = Compat.check_sensors(configParent === 'fan' ? 'fan' : 'temp');
+            let sensor_ids = Object.keys(sensors);
             let item = new Select(_('Sensor'));
-            if (_idlist.length === 0) {
+            if (sensor_ids.length === 0) {
                 item.add([_('Please install lm-sensors')]);
-            } else if (_idlist.length === 1) {
-                this.schema.set_string(key, _idlist[0]);
+            } else if (sensor_ids.length === 1) {
+                this.schema.set_string(key, sensor_ids[0]);
             }
-            item.add(_idlist);
+            item.add(sensor_ids);
             try {
-                item.set_value(_idlist.indexOf(this.schema.get_string(key)));
+                item.set_value(sensor_ids.indexOf(this.schema.get_string(key)));
             } catch (e) {
                 item.set_value(0);
             }
@@ -206,7 +205,7 @@ const SettingFrame = class SystemMonitor {
                 this.hbox2.pack_start(item.actor, true, false, 0);
             }
             item.selector.connect('changed', function (combo) {
-                set_string(combo, Schema, key, _idlist);
+                set_string(combo, Schema, key, sensor_ids);
             });
         // hbox3
         } else if (config === 'speed-in-bits') {
