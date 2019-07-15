@@ -1,8 +1,6 @@
 const Gtk = imports.gi.Gtk;
 const Gio = imports.gi.Gio;
 const Gdk = imports.gi.Gdk;
-const GLib = imports.gi.GLib;
-const ByteArray = imports.byteArray;
 
 const Gettext = imports.gettext.domain('system-monitor');
 
@@ -35,42 +33,6 @@ function color_to_hex(color) {
         255 * color.blue,
         255 * color.alpha);
     return output;
-}
-
-function check_sensors(sensor_type) {
-    log("[System monitor] check_sensors(%s)".format(sensor_type));
-    let sensors = {};
-    let [ok, out, err] = GLib.spawn_sync(
-        null, ["/bin/sh", "-c", "ls /sys/class/hwmon/hwmon*/%s*_input".format(sensor_type)], 
-        null, 0, null);
-    // NOTE: "".split("\n") returns [""], hence handle out == "" explicitly
-    if (out.length > 0) {
-        let hwmon = ByteArray.toString(out).trim("\n").split("\n");
-        for (let input_path of hwmon) {
-            // don't bother with unreadable sensors
-            try {
-                GLib.file_get_contents(input_path);
-            }
-            catch (e) {
-                log(e);
-                continue;
-            }
-            // NOTE: contents of "name" and "*_label" files have a trailing newline
-            let [, bytes]  = GLib.file_get_contents(GLib.path_get_dirname(input_path) + "/name");
-            let name = ByteArray.toString(bytes).trim("\n");
-            let label_path = input_path.replace(/_input$/, "_label");
-            let label;
-            if (GLib.file_test(label_path, GLib.FileTest.EXISTS)) {
-                [, bytes] = GLib.file_get_contents(label_path);
-                label = ByteArray.toString(bytes).trim("\n");
-            }
-            else {
-                label = GLib.path_get_basename(input_path).replace(/_input$/, "");
-            }
-            sensors["%s:%s".format(name, label)] = input_path;
-        }
-    }
-    return sensors;
 }
 
 
@@ -223,17 +185,17 @@ const SettingFrame = class SystemMonitor {
             });
         } else if (config.match(/sensor/)) {
             let sensor_type = configParent === 'fan' ? 'fan' : 'temp';
-            let _sensors = check_sensors(sensor_type);
-            let [_idlist, _pathlist] = [Object.keys(_sensors), Object.values(_sensors)];
+            let _sensors = Compat.check_sensors(sensor_type);
+            let _idlist = Object.keys(_sensors);
             let item = new Select(_('Sensor'));
-            if (_pathlist.length === 0) {
+            if (_idlist.length === 0) {
                 item.add([_('Please install lm-sensors')]);
-            } else if (_pathlist.length === 1) {
-                this.schema.set_string(key, _pathlist[0]);
+            } else if (_idlist.length === 1) {
+                this.schema.set_string(key, _idlist[0]);
             }
             item.add(_idlist);
             try {
-                item.set_value(_pathlist.indexOf(this.schema.get_string(key)));
+                item.set_value(_idlist.indexOf(this.schema.get_string(key)));
             } catch (e) {
                 item.set_value(0);
             }
@@ -244,7 +206,7 @@ const SettingFrame = class SystemMonitor {
                 this.hbox2.pack_start(item.actor, true, false, 0);
             }
             item.selector.connect('changed', function (combo) {
-                set_string(combo, Schema, key, _pathlist);
+                set_string(combo, Schema, key, _idlist);
             });
         // hbox3
         } else if (config === 'speed-in-bits') {

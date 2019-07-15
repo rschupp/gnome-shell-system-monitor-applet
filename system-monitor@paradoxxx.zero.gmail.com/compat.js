@@ -2,6 +2,7 @@ const Config = imports.misc.config;
 const Clutter = imports.gi.Clutter;
 const System = imports.system;
 const ByteArray = imports.byteArray;
+const GLib = imports.gi.GLib;
 
 /** Compare two dotted version strings (like '10.2.3').
  * @returns {Integer} 0: v1 == v2, -1: v1 < v2, 1: v1 > v2

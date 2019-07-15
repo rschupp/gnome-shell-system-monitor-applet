@@ -2001,8 +2001,8 @@ const Thermal = class SystemMonitor_Thermal extends ElementBase {
             item_name: _('Thermal'),
             color_name: ['tz0']
         });
+        this.sensors = Compat.check_sensors("temp");
         this.max = 100;
-
         this.item_name = _('Thermal');
         this.temperature = '-- ';
         this.fahrenheit_unit = Schema.get_boolean(this.elt + '-fahrenheit-unit');
@@ -2012,9 +2012,10 @@ const Thermal = class SystemMonitor_Thermal extends ElementBase {
         this.update();
     }
     refresh() {
-        let sfile = Schema.get_string(this.elt + '-sensor-file');
-        if (GLib.file_test(sfile, GLib.FileTest.EXISTS)) {
-            let file = Gio.file_new_for_path(sfile);
+        let sensor_id = Schema.get_string(this.elt + '-sensor-file');
+        let input_path = this.sensors[sensor_id];
+        if (input_path && GLib.file_test(input_path, GLib.FileTest.EXISTS)) {
+            let file = Gio.file_new_for_path(input_path);
             file.load_contents_async(null, (source, result) => {
                 let as_r = source.load_contents_finish(result)
                 this.temperature = Math.round(parseInt(ByteArray.toString(as_r[1])) / 1000);
@@ -2023,7 +2024,8 @@ const Thermal = class SystemMonitor_Thermal extends ElementBase {
                 }
             });
         } else if (this.display_error) {
-            global.logError('error reading: ' + sfile);
+            global.logError(input_path ? 'unknown sensor id: ' + sensor_id
+                                       : 'error reading: ' + input_path);
             this.display_error = false;
         }
 
@@ -2076,6 +2078,7 @@ const Fan = class SystemMonitor_Fan extends ElementBase {
             item_name: _('Fan'),
             color_name: ['fan0']
         });
+        this.sensors = Compat.check_sensors("fan");
         this.rpm = 0;
         this.display_error = true;
         this.tip_format(_('rpm'));
@@ -2083,15 +2086,17 @@ const Fan = class SystemMonitor_Fan extends ElementBase {
         this.update();
     }
     refresh() {
-        let sfile = Schema.get_string(this.elt + '-sensor-file');
-        if (GLib.file_test(sfile, GLib.FileTest.EXISTS)) {
-            let file = Gio.file_new_for_path(sfile);
+        let sensor_id = Schema.get_string(this.elt + '-sensor-file');
+        let input_path = this.sensors[sensor_id];
+        if (input_path && GLib.file_test(input_path, GLib.FileTest.EXISTS)) {
+            let file = Gio.file_new_for_path(input_path);
             file.load_contents_async(null, (source, result) => {
                 let as_r = source.load_contents_finish(result)
                 this.rpm = parseInt(ByteArray.toString(as_r[1]));
             });
         } else if (this.display_error) {
-            global.logError('error reading: ' + sfile);
+            global.logError(input_path ? 'unknown sensor id: ' + sensor_id
+                                       : 'error reading: ' + input_path);
             this.display_error = false;
         }
     }
