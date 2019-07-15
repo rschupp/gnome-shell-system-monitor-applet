@@ -39,8 +39,7 @@ function color_to_hex(color) {
 
 function check_sensors(sensor_type) {
     log("[System monitor] check_sensors(%s)".format(sensor_type));
-    let sensor_list = [];
-    let string_list = [];
+    let sensors = {};
     let [ok, out, err] = GLib.spawn_sync(
         null, ["/bin/sh", "-c", "ls /sys/class/hwmon/hwmon*/%s*_input".format(sensor_type)], 
         null, 0, null);
@@ -68,11 +67,10 @@ function check_sensors(sensor_type) {
             else {
                 label = GLib.path_get_basename(input_path).replace(/_input$/, "");
             }
-            string_list.push("%s - %s".format(name.capitalize(), label.capitalize()));
-            sensor_list.push(input_path);
+            sensors["%s:%s".format(name, label)] = input_path;
         }
     }
-    return [sensor_list, string_list];
+    return sensors;
 }
 
 
@@ -225,16 +223,17 @@ const SettingFrame = class SystemMonitor {
             });
         } else if (config.match(/sensor/)) {
             let sensor_type = configParent === 'fan' ? 'fan' : 'temp';
-            let [_slist, _strlist] = check_sensors(sensor_type);
+            let _sensors = check_sensors(sensor_type);
+            let [_idlist, _pathlist] = [Object.keys(_sensors), Object.values(_sensors)];
             let item = new Select(_('Sensor'));
-            if (_slist.length === 0) {
+            if (_pathlist.length === 0) {
                 item.add([_('Please install lm-sensors')]);
-            } else if (_slist.length === 1) {
-                this.schema.set_string(key, _slist[0]);
+            } else if (_pathlist.length === 1) {
+                this.schema.set_string(key, _pathlist[0]);
             }
-            item.add(_strlist);
+            item.add(_idlist);
             try {
-                item.set_value(_slist.indexOf(this.schema.get_string(key)));
+                item.set_value(_pathlist.indexOf(this.schema.get_string(key)));
             } catch (e) {
                 item.set_value(0);
             }
@@ -245,7 +244,7 @@ const SettingFrame = class SystemMonitor {
                 this.hbox2.pack_start(item.actor, true, false, 0);
             }
             item.selector.connect('changed', function (combo) {
-                set_string(combo, Schema, key, _slist);
+                set_string(combo, Schema, key, _pathlist);
             });
         // hbox3
         } else if (config === 'speed-in-bits') {
